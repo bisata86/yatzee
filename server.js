@@ -40,7 +40,7 @@ function getUpperScore(points) {
 }
 
 function getUpperBonus(points) {
-    return getUpperScore(points) >= 64 ? 35 : 0;
+    return getUpperScore(points) >= 63 ? 35 : 0;
 }
 
 function calculateTotalScore(points) {
@@ -306,7 +306,7 @@ io.on('connection', (socket) => {
         player.score = calculateTotalScore(player.points);
 
         const newUpper = getUpperScore(player.points);
-        const earnedBonus = (priorUpper < 64 && newUpper >= 64);
+        const earnedBonus = (priorUpper < 63 && newUpper >= 63);
 
         // Check game over
         const isGameOver = room.players.every(p =>

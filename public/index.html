@@ -21,9 +21,10 @@
             --accent-rose: #f43f5e;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
-            --dice-bg: #ffffff;
-            --dice-held-bg: #15803d;
-            --dice-held-border: #4ade80;
+            
+            /* 3D Dice Responsive Variables */
+            --tz: -32px;
+            --tz-pos: 32px;
         }
 
         * {
@@ -138,7 +139,7 @@
             background: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 16px;
-            padding: 18px 24px;
+            padding: 24px 24px;
             margin-bottom: 20px;
             display: flex;
             flex-direction: column;
@@ -153,8 +154,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 16px;
-            padding: 8px 0;
+            gap: 24px;
+            padding: 12px 0;
             flex-wrap: wrap;
         }
 
@@ -162,53 +163,105 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 12px;
         }
-
-        .dice {
+        
+        /* 3D Dice Engine */
+        .scene {
             width: 64px;
             height: 64px;
-            border-radius: 12px;
-            background: #ffffff;
-            color: #0f172a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.9rem;
-            font-weight: 800;
-            font-family: 'JetBrains Mono', monospace;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.9);
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            perspective: 600px;
+        }
+        
+        .cube {
+            width: 100%;
+            height: 100%;
             position: relative;
+            transform-style: preserve-3d;
+            transform: translateZ(var(--tz)) rotateX(var(--rx, -20deg)) rotateY(var(--ry, -20deg));
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+        }
+        
+        .cube:hover:not(.locked) {
+            notransform: translateZ(calc(var(--tz) + 10px)) rotateX(calc(var(--rx, -20deg) + 15deg)) rotateY(calc(var(--ry, -20deg) - 15deg));
         }
 
-        .dice:hover:not(.locked) {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            display: grid;
+            grid-template-areas:
+                "a . c"
+                "e g f"
+                "d . b";
+            padding: 8px;
+            box-sizing: border-box;
+            box-shadow: inset 0 0 12px rgba(0,0,0,0.12);
+            transition: background 0.3s, border-color 0.3s;
         }
+        
+        .pip {
+            width: 12px;
+            height: 12px;
+            background-color: #0f172a;
+            border-radius: 50%;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+            transition: background 0.3s;
+        }
+        
+        /* 3D Spacial Positioning */
+        .front  { transform: rotateY(  0deg) translateZ(var(--tz-pos)); }
+        .back   { transform: rotateY(180deg) translateZ(var(--tz-pos)); }
+        .right  { transform: rotateY( 90deg) translateZ(var(--tz-pos)); }
+        .left   { transform: rotateY(-90deg) translateZ(var(--tz-pos)); }
+        .top    { transform: rotateX( 90deg) translateZ(var(--tz-pos)); }
+        .bottom { transform: rotateX(-90deg) translateZ(var(--tz-pos)); }
+        
+        /* Pip Grid Maps */
+        .front .pip:nth-child(1) { grid-area: g; align-self: center; justify-self: center; }
+        
+        .top .pip:nth-child(1) { grid-area: a; }
+        .top .pip:nth-child(2) { grid-area: b; align-self: end; justify-self: end; }
+        
+        .right .pip:nth-child(1) { grid-area: a; }
+        .right .pip:nth-child(2) { grid-area: g; align-self: center; justify-self: center; }
+        .right .pip:nth-child(3) { grid-area: b; align-self: end; justify-self: end; }
+        
+        .left .pip:nth-child(1) { grid-area: a; }
+        .left .pip:nth-child(2) { grid-area: c; justify-self: end; }
+        .left .pip:nth-child(3) { grid-area: d; align-self: end; }
+        .left .pip:nth-child(4) { grid-area: b; align-self: end; justify-self: end; }
+        
+        .bottom .pip:nth-child(1) { grid-area: a; }
+        .bottom .pip:nth-child(2) { grid-area: c; justify-self: end; }
+        .bottom .pip:nth-child(3) { grid-area: g; align-self: center; justify-self: center; }
+        .bottom .pip:nth-child(4) { grid-area: d; align-self: end; }
+        .bottom .pip:nth-child(5) { grid-area: b; align-self: end; justify-self: end; }
+        
+        .back .pip:nth-child(1) { grid-area: a; }
+        .back .pip:nth-child(2) { grid-area: c; justify-self: end; }
+        .back .pip:nth-child(3) { grid-area: e; align-self: center; }
+        .back .pip:nth-child(4) { grid-area: f; align-self: center; justify-self: end; }
+        .back .pip:nth-child(5) { grid-area: d; align-self: end; }
+        .back .pip:nth-child(6) { grid-area: b; align-self: end; justify-self: end; }
 
-        .dice.held {
+        .dice-wrapper.held .face {
             background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
-            color: #ffffff;
-            border: 2px solid var(--dice-held-border);
-            box-shadow: 0 0 16px rgba(34, 197, 94, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
+            border-color: #4ade80;
+        }
+        
+        .dice-wrapper.held .pip {
+            background-color: #ffffff;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        .dice.rolling {
-            animation: rollDice 0.5s ease-in-out;
-        }
-
-        @keyframes rollDice {
-            0% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(180deg) scale(0.85); }
-            100% { transform: rotate(360deg) scale(1); }
-        }
-
-        .dice.locked {
+        .dice-wrapper.locked .cube {
             cursor: not-allowed;
-            opacity: 0.85;
         }
 
         .dice-label {
@@ -229,7 +282,7 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            margin-top: 14px;
+            margin-top: 18px;
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -680,6 +733,11 @@
 
         /* Mobile Viewport Queries */
         @media (max-width: 768px) {
+            :root {
+                --tz: -26px;
+                --tz-pos: 26px;
+            }
+            
             body {
                 padding: 12px 10px 30px 10px;
             }
@@ -727,15 +785,23 @@
             }
 
             .diceCont {
-                gap: 8px;
+                gap: 12px;
                 padding: 4px 0;
             }
-
-            .dice {
+            
+            .scene {
                 width: 52px;
                 height: 52px;
-                font-size: 1.6rem;
+            }
+
+            .face {
+                padding: 5px;
                 border-radius: 10px;
+            }
+            
+            .pip {
+                width: 10px;
+                height: 10px;
             }
 
             .dice-label {
@@ -871,7 +937,7 @@
         </div>
     </div>
 
-    <!-- Mobile Tabs Bar (Visible on Mobile Screens Only) -->
+    <!-- Mobile Tabs Bar -->
     <div class="mobile-board-tabs">
         <button class="board-tab active" data-tab="0" id="tab0">
             <span id="tabTitle0">👤 You</span>
@@ -967,14 +1033,12 @@
         var dices = [];
         var players = [];
 
-        // Modes: 'online' or 'ai'
         var gameMode = 'ai';
         var currentRoomId = null;
-        var myPlayerIndex = 0; // 0 for host/you, 1 for opponent in online mode
+        var myPlayerIndex = 0; 
         var currentTurnIndex = 0;
         var socket = null;
 
-        // Mobile viewing state
         var mobileActiveTab = 0;
         var isSplitView = false;
         var manualTabSelection = false;
@@ -1011,7 +1075,7 @@
         }
 
         function getUpperBonus(player) {
-            return getUpperScore(player) >= 64 ? 35 : 0;
+            return getUpperScore(player) >= 63 ? 35 : 0;
         }
 
         function calculateTotalScore(player) {
@@ -1026,27 +1090,79 @@
         }
 
         function isMyTurn() {
-            if (gameMode === 'ai') {
-                return currentTurnIndex === 0;
-            }
+            if (gameMode === 'ai') return currentTurnIndex === 0;
             return currentTurnIndex === myPlayerIndex;
+        }
+
+        function getRotationForValue(val) {
+            switch (val) {
+                case 1: return { x: 0, y: 0 };
+                case 2: return { x: -90, y: 0 };
+                case 3: return { x: 0, y: -90 };
+                case 4: return { x: 0, y: 90 };
+                case 5: return { x: 90, y: 0 };
+                case 6: return { x: 0, y: 180 };
+                default: return { x: -20, y: -20 };
+            }
+        }
+
+        function spinCubes() {
+            $(".cube").each(function(idx) {
+                if (!dices[idx].keep) {
+                    var cube = $(this);
+                    var currentX = parseFloat(cube.attr('data-rotX') || -20);
+                    var currentY = parseFloat(cube.attr('data-rotY') || -20);
+                    
+                    var newX = currentX + 720 + Math.floor(Math.random() * 360);
+                    var newY = currentY + 720 + Math.floor(Math.random() * 360);
+                    
+                    cube.attr('data-rotX', newX);
+                    cube.attr('data-rotY', newY);
+                    cube[0].style.setProperty('--rx', newX + 'deg');
+                    cube[0].style.setProperty('--ry', newY + 'deg');
+                }
+            });
         }
 
         function updateDiceUI() {
             for (var i = 0; i < nrDices; i++) {
-                var diceElem = $("#dice" + i);
+                var cube = $("#dice" + i);
                 var wrapper = $("#diceWrap" + i);
                 var label = $("#diceLabel" + i);
                 var val = dices[i].value;
 
-                diceElem.text(val !== null ? val : "-");
+                if (val !== null) {
+                    var rot = getRotationForValue(val);
+                    var currentX = parseFloat(cube.attr('data-rotX') || -20);
+                    var currentY = parseFloat(cube.attr('data-rotY') || -20);
+                    
+                    var diffX = rot.x - (currentX % 360);
+                    var diffY = rot.y - (currentY % 360);
+                    
+                    if (diffX > 180) diffX -= 360;
+                    if (diffX < -180) diffX += 360;
+                    if (diffY > 180) diffY -= 360;
+                    if (diffY < -180) diffY += 360;
+                    
+                    var newX = currentX + diffX;
+                    var newY = currentY + diffY;
+                    
+                    cube.attr('data-rotX', newX);
+                    cube.attr('data-rotY', newY);
+                    
+                    cube[0].style.setProperty('--rx', newX + 'deg');
+                    cube[0].style.setProperty('--ry', newY + 'deg');
+                } else {
+                    cube.attr('data-rotX', -20);
+                    cube.attr('data-rotY', -20);
+                    cube[0].style.setProperty('--rx', '-20deg');
+                    cube[0].style.setProperty('--ry', '-20deg');
+                }
 
                 if (dices[i].keep) {
-                    diceElem.addClass("held");
                     wrapper.addClass("held");
                     label.text("HELD");
                 } else {
-                    diceElem.removeClass("held");
                     wrapper.removeClass("held");
                     label.text("");
                 }
@@ -1054,9 +1170,9 @@
                 var myTurn = isMyTurn();
                 var activePlayer = players[currentTurnIndex];
                 if (!myTurn || !activePlayer || activePlayer.rolls === 3) {
-                    diceElem.addClass("locked");
+                    wrapper.addClass("locked");
                 } else {
-                    diceElem.removeClass("locked");
+                    wrapper.removeClass("locked");
                 }
             }
         }
@@ -1175,17 +1291,16 @@
                                  (i === currentTurnIndex ? "Active Turn" : "Waiting") + "</span></div>";
 
                 // Upper section
-                var rowsHtml = "<div class='section-label'><span>Upper Section</span><span class='target-hint'>64+ for +35</span></div>";
+                var rowsHtml = "<div class='section-label'><span>Upper Section</span><span class='target-hint'>63+ for +35</span></div>";
                 for (var u = 0; u < upperCategories.length; u++) {
                     rowsHtml += renderCategoryRow(i, upperCategories[u], player, suggestions);
                 }
 
-                // Upper subtotal & bonus
                 var upperScore = getUpperScore(player);
-                var hasBonus = upperScore >= 64;
+                var hasBonus = upperScore >= 63;
                 rowsHtml += "<div class='subtotal-row'>" +
                             "<label>Upper Total</label>" +
-                            "<span class='score-val'>" + upperScore + " / 64</span>" +
+                            "<span class='score-val'>" + upperScore + " / 63</span>" +
                             "</div>";
 
                 rowsHtml += "<div class='subtotal-row bonus-row " + (hasBonus ? "bonus-achieved" : "") + "'>" +
@@ -1199,13 +1314,11 @@
                     rowsHtml += renderCategoryRow(i, lowerCategories[l], player, suggestions);
                 }
 
-                // Total score
                 player.score = calculateTotalScore(player);
                 var totalHtml = "<div class='total-row'><label>Total Score</label><span class='score-val'>" + player.score + "</span></div>";
                 board.html(headerHtml + rowsHtml + totalHtml);
             }
 
-            // Click listener for scoring
             $(".score-row.selectable").off("click").on("click", function() {
                 if (!isMyTurn()) return;
                 var activePlayer = players[currentTurnIndex];
@@ -1222,7 +1335,6 @@
                         category: pointName
                     });
                 } else {
-                    // Local vs AI mode
                     var pointsToAdd = calcP(pointName, dices);
                     var priorUpper = getUpperScore(activePlayer);
 
@@ -1231,8 +1343,8 @@
                     activePlayer.score = calculateTotalScore(activePlayer);
 
                     var newUpper = getUpperScore(activePlayer);
-                    if (priorUpper < 64 && newUpper >= 64) {
-                        setMessage("🎉 You scored 64+ upper points and earned the +35 bonus!", "you");
+                    if (priorUpper < 63 && newUpper >= 63) {
+                        setMessage("🎉 You scored 63+ upper points and earned the +35 bonus!", "you");
                     }
 
                     endTurnAiMode();
@@ -1250,14 +1362,10 @@
                 console.warn('Socket.IO client library not loaded.');
                 return;
             }
-
-            if (socket) return; // already initialized
-
+            if (socket) return;
             socket = io();
 
-            socket.on('connect', function() {
-                console.log('Connected to game server:', socket.id);
-            });
+            socket.on('connect', function() { console.log('Connected to game server:', socket.id); });
 
             socket.on('room_created', function(data) {
                 currentRoomId = data.roomId;
@@ -1276,9 +1384,7 @@
                 $("#waitingModal").hide();
             });
 
-            socket.on('join_error', function(data) {
-                alert(data.message || 'Could not join room.');
-            });
+            socket.on('join_error', function(data) { alert(data.message || 'Could not join room.'); });
 
             socket.on('game_started', function(data) {
                 $("#waitingModal").hide();
@@ -1304,13 +1410,10 @@
                 dices = data.dices;
                 players[data.playerIndex].rolls = data.rollsLeft;
 
-                // Animate rolling effect
-                $(".dice").each(function(idx) {
-                    if (!dices[idx].keep) $(this).addClass("rolling");
-                });
+                // Animate for the observing player
+                if (!isMyTurn()) spinCubes();
 
                 setTimeout(function() {
-                    $(".dice").removeClass("rolling");
                     updateDiceUI();
                     drawpoints(true);
                     updateControlsState();
@@ -1320,7 +1423,7 @@
                     } else {
                         setMessage(players[currentTurnIndex].name + " rolled. Watching move...", "opponent");
                     }
-                }, 400);
+                }, 500);
             });
 
             socket.on('keep_updated', function(data) {
@@ -1338,7 +1441,6 @@
                 p.points[data.category].fixed = true;
                 p.score = data.totalScore;
 
-                // Highlight chosen row
                 $("#row_" + data.playerIndex + "_" + data.category).addClass("highlight-action");
 
                 var bonusText = data.earnedBonus ? " (earned +35 bonus!)" : "";
@@ -1375,11 +1477,8 @@
                 updateDiceUI();
                 updateControlsState();
 
-                if (isMyTurn()) {
-                    setMessage("New match started! Your turn!", "you");
-                } else {
-                    setMessage("New match started! " + players[currentTurnIndex].name + "'s turn.", "opponent");
-                }
+                if (isMyTurn()) setMessage("New match started! Your turn!", "you");
+                else setMessage("New match started! " + players[currentTurnIndex].name + "'s turn.", "opponent");
             });
 
             socket.on('rematch_offered', function(data) {
@@ -1433,20 +1532,8 @@
             var pName = $("#playerNameInput").val().trim() || "Player 1";
 
             players = [
-                {
-                    name: pName,
-                    playerIndex: 0,
-                    rolls: 3,
-                    score: 0,
-                    points: createPointsObj()
-                },
-                {
-                    name: "AI Opponent",
-                    playerIndex: 1,
-                    rolls: 3,
-                    score: 0,
-                    points: createPointsObj()
-                }
+                { name: pName, playerIndex: 0, rolls: 3, score: 0, points: createPointsObj() },
+                { name: "AI Opponent", playerIndex: 1, rolls: 3, score: 0, points: createPointsObj() }
             ];
 
             dices = [];
@@ -1505,7 +1592,6 @@
             updateControlsState();
 
             setTimeout(function() {
-                // Roll 1
                 rollDicesLocal(function() {
                     setTimeout(function() {
                         var decision = decideAiKeepsLocal(dices, players[1].rolls, players[1].points, players[1]);
@@ -1515,8 +1601,7 @@
                             finishAiTurnLocal();
                             return;
                         }
-
-                        // Roll 2
+                        
                         setTimeout(function() {
                             rollDicesLocal(function() {
                                 setTimeout(function() {
@@ -1527,36 +1612,32 @@
                                         finishAiTurnLocal();
                                         return;
                                     }
-
-                                    // Roll 3
+                                    
                                     setTimeout(function() {
                                         rollDicesLocal(function() {
-                                            setTimeout(finishAiTurnLocal, 800);
+                                            setTimeout(finishAiTurnLocal, 1000);
                                         });
-                                    }, 800);
-                                }, 800);
+                                    }, 900);
+                                }, 900);
                             });
-                        }, 800);
-                    }, 800);
+                        }, 900);
+                    }, 900);
                 });
             }, 700);
         }
 
         function rollDicesLocal(cb) {
             players[1].rolls--;
-            $(".dice").each(function(idx) {
-                if (!dices[idx].keep) $(this).addClass("rolling");
-            });
+            spinCubes();
 
             setTimeout(function() {
                 for (var i = 0; i < dices.length; i++) {
                     if (!dices[i].keep) dices[i].value = Math.floor(Math.random() * 6) + 1;
                 }
-                $(".dice").removeClass("rolling");
                 updateDiceUI();
                 drawpoints(true);
                 if (cb) cb();
-            }, 400);
+            }, 500);
         }
 
         function applyKeepsLocal(keepIndices) {
@@ -1571,7 +1652,6 @@
             var pts = calcP(bestCat, dices);
 
             $("#row_1_" + bestCat).addClass("highlight-action");
-
             var priorUpper = getUpperScore(players[1]);
 
             setTimeout(function() {
@@ -1580,13 +1660,11 @@
                 players[1].score = calculateTotalScore(players[1]);
 
                 var newUpper = getUpperScore(players[1]);
-                var bonusText = (priorUpper < 64 && newUpper >= 64) ? " (earned +35 bonus!)" : "";
+                var bonusText = (priorUpper < 63 && newUpper >= 63) ? " (earned +35 bonus!)" : "";
                 setMessage("AI chose " + categoryNames[bestCat] + " (+" + pts + " pts)" + bonusText + "!", "opponent");
 
-                setTimeout(function() {
-                    endTurnAiMode();
-                }, 1000);
-            }, 1000);
+                setTimeout(function() { endTurnAiMode(); }, 1200);
+            }, 1200);
         }
 
         function decideAiKeepsLocal(currentDices, rollsLeft, points, player) {
@@ -1604,12 +1682,8 @@
                 return res;
             }
 
-            for (var v in counts) {
-                if (counts[v] === 5) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
-            }
-            for (var v in counts) {
-                if (counts[v] === 4) return { keepIndices: getIndicesOfValue(parseInt(v)), stopEarly: false };
-            }
+            for (var v in counts) if (counts[v] === 5) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
+            for (var v in counts) if (counts[v] === 4) return { keepIndices: getIndicesOfValue(parseInt(v)), stopEarly: false };
 
             var isLarge = (unique.length === 5 && ((unique[0] === 1 && unique[4] === 5) || (unique[0] === 2 && unique[4] === 6)));
             if (isLarge && (!points.largeStraight.fixed || !points.smallStraight.fixed)) {
@@ -1701,7 +1775,7 @@
                     else base = (num === 1 ? 15 : 5) + score;
 
                     var curUpper = getUpperScore(player);
-                    if (curUpper < 64 && (curUpper + score) >= 64) base += 350;
+                    if (curUpper < 63 && (curUpper + score) >= 63) base += 350;
                     return base;
                 }
                 return score;
@@ -1715,9 +1789,6 @@
             }
         }
 
-        /* -------------------------------------------------------------------------
-         * Score Calculation (calcP)
-         * ------------------------------------------------------------------------- */
         function calcP(point, dices) {
             if (!dices || dices.length === 0 || dices[0].value == null) return 0;
             var values = dices.map(d => d.value);
@@ -1735,11 +1806,9 @@
                 case 'threeOfAKind':
                     for (var c in counts) if (counts[c] >= 3) return values.reduce((a, b) => a + b, 0);
                     return 0;
-
                 case 'fourOfAKind':
                     for (var c in counts) if (counts[c] >= 4) return values.reduce((a, b) => a + b, 0);
                     return 0;
-
                 case 'fullHouse':
                     var hasThree = false, hasTwo = false;
                     for (var c in counts) {
@@ -1748,7 +1817,6 @@
                         if (counts[c] === 5) { hasThree = true; hasTwo = true; }
                     }
                     return (hasThree && hasTwo) ? 25 : 0;
-
                 case 'smallStraight':
                     var unique = [...new Set(values)].sort((a, b) => a - b);
                     var sStraights = [[1,2,3,4], [2,3,4,5], [3,4,5,6]];
@@ -1756,7 +1824,6 @@
                         if (s.every(n => unique.includes(n))) return 30;
                     }
                     return 0;
-
                 case 'largeStraight':
                     var uniqueL = [...new Set(values)].sort((a, b) => a - b);
                     var lStraights = [[1,2,3,4,5], [2,3,4,5,6]];
@@ -1764,14 +1831,11 @@
                         if (l.every(n => uniqueL.includes(n))) return 40;
                     }
                     return 0;
-
                 case 'yahtzee':
                     for (var c in counts) if (counts[c] === 5) return 50;
                     return 0;
-
                 case 'chance':
                     return values.reduce((a, b) => a + b, 0);
-
                 default:
                     return 0;
             }
@@ -1787,37 +1851,41 @@
          * Document Ready & Event Bindings
          * ------------------------------------------------------------------------- */
         $(function() {
-            // Build 5 dice DOM
+            // Build 5 dice DOM (3D Cubes)
             for (var i = 0; i < nrDices; i++) {
                 $(".diceCont").append(
                     "<div class='dice-wrapper' id='diceWrap" + i + "'>" +
-                    "<div class='dice' id='dice" + i + "'>-</div>" +
-                    "<div class='dice-label' id='diceLabel" + i + "'></div>" +
+                        "<div class='scene'>" +
+                            "<div class='cube' id='dice" + i + "' data-index='" + i + "'>" +
+                                "<div class='face front'><span class='pip'></span></div>" +
+                                "<div class='face top'><span class='pip'></span><span class='pip'></span></div>" +
+                                "<div class='face right'><span class='pip'></span><span class='pip'></span><span class='pip'></span></div>" +
+                                "<div class='face left'><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span></div>" +
+                                "<div class='face bottom'><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span></div>" +
+                                "<div class='face back'><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span><span class='pip'></span></div>" +
+                            "</div>" +
+                        "</div>" +
+                        "<div class='dice-label' id='diceLabel" + i + "'></div>" +
                     "</div>"
                 );
             }
 
-            // Build 2 player board containers
             for (var i = 0; i < nrPlayers; i++) {
                 $(".boardCont").append("<div class='board' id='board" + i + "'></div>");
             }
 
-            // Initialize socket connection
             setupSocket();
 
-            // Dice Click (Hold / Unhold)
-            $(".dice").on("click", function() {
+            // Dice Click (Event delegation for dynamically generated cubes)
+            $(document).on("click", ".cube", function() {
                 if (!isMyTurn()) return;
                 var activePlayer = players[currentTurnIndex];
                 if (!activePlayer || activePlayer.rolls >= 3) return;
 
-                var index = parseInt($(this).attr("id").replace("dice", ""));
+                var index = parseInt($(this).attr("data-index"));
 
                 if (gameMode === 'online') {
-                    socket.emit('toggle_keep', {
-                        roomId: currentRoomId,
-                        diceIndex: index
-                    });
+                    socket.emit('toggle_keep', { roomId: currentRoomId, diceIndex: index });
                 } else {
                     dices[index].keep = !dices[index].keep;
                     updateDiceUI();
@@ -1831,29 +1899,26 @@
                 if (!activePlayer || activePlayer.rolls <= 0) return;
 
                 if (gameMode === 'online') {
+                    spinCubes();
                     socket.emit('roll_dice', { roomId: currentRoomId });
                 } else {
                     activePlayer.rolls--;
-                    $(".dice").each(function(idx) {
-                        if (!dices[idx].keep) $(this).addClass("rolling");
-                    });
+                    spinCubes();
+                    
                     setTimeout(function() {
                         for (var i = 0; i < dices.length; i++) {
                             if (!dices[i].keep) dices[i].value = Math.floor(Math.random() * 6) + 1;
                         }
-                        $(".dice").removeClass("rolling");
                         updateDiceUI();
                         drawpoints(true);
                         updateControlsState();
                         setMessage("Click dice to hold/unhold or choose a scorecard category.", "you");
-                    }, 400);
+                    }, 500);
                 }
             });
 
-            // Lobby & Navigation Buttons
-            $("#lobbyBtn, #btnExitLobby").on("click", function() {
-                showLobby();
-            });
+            // Navigation Buttons
+            $("#lobbyBtn, #btnExitLobby").on("click", function() { showLobby(); });
 
             $("#btnCreateRoom").on("click", function() {
                 var pName = $("#playerNameInput").val().trim() || "Player 1";
@@ -1880,13 +1945,8 @@
                 socket.emit('join_room', { roomId: code, playerName: pName });
             });
 
-            $("#btnPlayAi").on("click", function() {
-                startLocalAiGame();
-            });
-
-            $("#btnCancelWaiting").on("click", function() {
-                showLobby();
-            });
+            $("#btnPlayAi").on("click", function() { startLocalAiGame(); });
+            $("#btnCancelWaiting").on("click", function() { showLobby(); });
 
             $("#btnCopyCode, #headerRoomTag").on("click", function() {
                 if (!currentRoomId) return;
@@ -1908,25 +1968,17 @@
 
             // Mobile Tabs
             $("#tab0").on("click", function() {
-                mobileActiveTab = 0;
-                isSplitView = false;
-                manualTabSelection = true;
-                updateMobileTabs();
+                mobileActiveTab = 0; isSplitView = false; manualTabSelection = true; updateMobileTabs();
             });
 
             $("#tab1").on("click", function() {
-                mobileActiveTab = 1;
-                isSplitView = false;
-                manualTabSelection = true;
-                updateMobileTabs();
+                mobileActiveTab = 1; isSplitView = false; manualTabSelection = true; updateMobileTabs();
             });
 
             $("#mobileViewToggle").on("click", function() {
-                isSplitView = !isSplitView;
-                updateMobileTabs();
+                isSplitView = !isSplitView; updateMobileTabs();
             });
 
-            // Default start in lobby
             showLobby();
         });
     </script>
