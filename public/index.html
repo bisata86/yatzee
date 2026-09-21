@@ -1672,7 +1672,6 @@
             var counts = {};
             for (var v of values) counts[v] = (counts[v] || 0) + 1;
             var unique = [...new Set(values)].sort((a, b) => a - b);
-            var keeps = [];
 
             function getIndicesOfValue(val) {
                 var res = [];
@@ -1682,54 +1681,125 @@
                 return res;
             }
 
-            for (var v in counts) if (counts[v] === 5) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
-            for (var v in counts) if (counts[v] === 4) return { keepIndices: getIndicesOfValue(parseInt(v)), stopEarly: false };
+            function getSubsetDice(keepIndices) {
+                return keepIndices.map(i => ({ value: currentDices[i].value }));
+            }
 
-            var isLarge = (unique.length === 5 && ((unique[0] === 1 && unique[4] === 5) || (unique[0] === 2 && unique[4] === 6)));
-            if (isLarge && (!points.largeStraight.fixed || !points.smallStraight.fixed)) {
+            function scoreKeepMask(keepIndices) {
+                if (keepIndices.length === 0) {
+                    var emptyPenalty = 0;
+                    if (rollsLeft <= 1) emptyPenalty -= 25;
+                    return emptyPenalty;
+                }
+
+                var subset = getSubsetDice(keepIndices);
+                var keptValues = subset.map(d => d.value);
+                var subsetCounts = {};
+                for (var v of keptValues) subsetCounts[v] = (subsetCounts[v] || 0) + 1;
+
+                var score = 0;
+                var openCats = Object.keys(points).filter(k => !points[k].fixed);
+
+                for (var cat of openCats) {
+                    var catScore = calcP(cat, subset);
+                    if (catScore > 0) {
+                        score += computeCategoryUtilityLocal(cat, catScore, subset, player) * 1.2;
+                    }
+                }
+
+                if (keepIndices.length === 5) score += 120;
+                if (Object.values(subsetCounts).includes(5)) score += 1000;
+                if (Object.values(subsetCounts).includes(4)) score += 600;
+                if (Object.values(subsetCounts).includes(3) && Object.values(subsetCounts).includes(2)) score += 450;
+                if (Object.values(subsetCounts).includes(3)) score += 220;
+                if (Object.values(subsetCounts).filter(c => c === 2).length >= 2) score += 180;
+
+                var straightRuns = [[1,2,3,4], [2,3,4,5], [3,4,5,6], [1,2,3,4,5], [2,3,4,5,6]];
+                for (var r of straightRuns) {
+                    if (r.every(n => [...new Set(keptValues)].includes(n))) {
+                        score += r.length * 45;
+                        break;
+                    }
+                }
+
+                if (keepIndices.length >= 3) {
+                    var upperPriorityBonus = 0;
+                    for (var cat of upperCategories) {
+                        if (!points[cat].fixed) {
+                            var catValue = parseInt(cat.replace('d', ''));
+                            if (keptValues.includes(catValue)) {
+                                upperPriorityBonus += 20 + catValue * 3;
+                            }
+                        }
+                    }
+                    score += upperPriorityBonus;
+                }
+
+                if (rollsLeft === 0) score += keepIndices.length * 20;
+                if (keepIndices.length <= 1 && score < 85) score -= 40;
+                if (keepIndices.length >= 4 && score < 120) score -= 30;
+                return score;
+            }
+
+            var bestKeepIndices = [];
+            var bestScore = -Infinity;
+            for (var mask = 1; mask < (1 << currentDices.length); mask++) {
+                var keepIndices = [];
+                for (var i = 0; i < currentDices.length; i++) {
+                    if (mask & (1 << i)) keepIndices.push(i);
+                }
+
+                var maskScore = scoreKeepMask(keepIndices);
+                if (maskScore > bestScore) {
+                    bestScore = maskScore;
+                    bestKeepIndices = keepIndices;
+                }
+            }
+
+            var hasFiveKind = Object.values(counts).includes(5);
+            var hasFourKind = Object.values(counts).includes(4);
+            var hasThreeKind = Object.values(counts).includes(3);
+            var hasTwoPairs = Object.values(counts).filter(c => c === 2).length >= 2;
+            var isLargeStraight = unique.length >= 4 && (
+                (unique.includes(1) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) ||
+                (unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5) && unique.includes(6))
+            );
+            var isSmallStraight = unique.length >= 3 && (
+                (unique.includes(1) && unique.includes(2) && unique.includes(3) && unique.includes(4)) ||
+                (unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) ||
+                (unique.includes(3) && unique.includes(4) && unique.includes(5) && unique.includes(6))
+            );
+
+            if (hasFiveKind) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
+            if (hasFourKind) return { keepIndices: getIndicesOfValue(Math.max(...Object.keys(counts).filter(k => counts[k] === 4).map(Number))), stopEarly: false };
+            if (isLargeStraight && (!points.largeStraight.fixed || !points.smallStraight.fixed)) {
                 return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
             }
-
-            var has3 = false, val3 = null, has2 = false, val2 = null;
-            for (var v in counts) {
-                if (counts[v] === 3) { has3 = true; val3 = parseInt(v); }
-                if (counts[v] === 2) { has2 = true; val2 = parseInt(v); }
-            }
-            if (has3 && has2) {
+            if (isSmallStraight && !points.smallStraight.fixed) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: false };
+            if (hasThreeKind && hasTwoPairs) {
                 if (!points.fullHouse.fixed) return { keepIndices: [0, 1, 2, 3, 4], stopEarly: true };
-                return { keepIndices: getIndicesOfValue(val3), stopEarly: false };
+            }
+            if (hasThreeKind) return { keepIndices: getIndicesOfValue(Object.keys(counts).filter(k => counts[k] === 3).map(Number)[0]), stopEarly: false };
+            if (hasTwoPairs) {
+                var pairVals = Object.keys(counts).filter(k => counts[k] === 2).map(Number).sort((a, b) => b - a);
+                return { keepIndices: [...getIndicesOfValue(pairVals[0]), ...getIndicesOfValue(pairVals[1])], stopEarly: false };
             }
 
-            var straightRuns = [[1,2,3,4], [2,3,4,5], [3,4,5,6]];
-            for (var r of straightRuns) {
-                if (r.every(n => unique.includes(n))) {
-                    for (var n of r) {
-                        var idx = currentDices.findIndex((d, i) => d.value === n && !keeps.includes(i));
-                        if (idx !== -1) keeps.push(idx);
-                    }
-                    if (!points.largeStraight.fixed && rollsLeft > 0) return { keepIndices: keeps, stopEarly: false };
-                    return { keepIndices: keeps, stopEarly: rollsLeft === 0 };
-                }
+            if (bestKeepIndices.length > 0 && bestKeepIndices.length < 3 && (rollsLeft > 0 || bestScore > 180)) {
+                return { keepIndices: bestKeepIndices, stopEarly: false };
             }
 
-            if (has3) return { keepIndices: getIndicesOfValue(val3), stopEarly: false };
-
-            var pairs = [];
-            for (var v in counts) if (counts[v] === 2) pairs.push(parseInt(v));
-            if (pairs.length === 2) {
-                if (!points.fullHouse.fixed && rollsLeft > 0) {
-                    return { keepIndices: [...getIndicesOfValue(pairs[0]), ...getIndicesOfValue(pairs[1])], stopEarly: false };
-                }
-                return { keepIndices: getIndicesOfValue(Math.max(pairs[0], pairs[1])), stopEarly: false };
-            }
-
-            if (pairs.length === 1) return { keepIndices: getIndicesOfValue(pairs[0]), stopEarly: false };
-
+            var keepFallback = [];
             if (rollsLeft > 0) {
-                if (!points.d6.fixed && values.includes(6)) keeps.push(values.indexOf(6));
-                if (!points.d5.fixed && values.includes(5)) keeps.push(values.indexOf(5));
+                if (!points.d6.fixed && values.includes(6)) keepFallback = keepFallback.concat(getIndicesOfValue(6));
+                if (!points.d5.fixed && values.includes(5)) keepFallback = keepFallback.concat(getIndicesOfValue(5));
+                if (!points.d4.fixed && values.includes(4)) keepFallback = keepFallback.concat(getIndicesOfValue(4));
+                if (!points.d1.fixed && values.includes(1)) keepFallback = keepFallback.concat(getIndicesOfValue(1));
             }
-            return { keepIndices: keeps, stopEarly: false };
+
+            if (keepFallback.length > 0) return { keepIndices: keepFallback, stopEarly: false };
+
+            return { keepIndices: bestKeepIndices.length ? bestKeepIndices : [], stopEarly: bestKeepIndices.length === 5 };
         }
 
         function evaluateBestCategoryLocal(currentDices, points, player) {
@@ -1737,11 +1807,28 @@
             if (open.length === 0) return null;
 
             var bestCat = open[0];
-            var bestUtil = -99999;
+            var bestUtil = -Infinity;
+            var upperBaseline = getUpperScore(player);
 
             for (var cat of open) {
                 var score = calcP(cat, currentDices);
                 var util = computeCategoryUtilityLocal(cat, score, currentDices, player);
+
+                if (cat.startsWith('d')) {
+                    var num = parseInt(cat.replace('d', ''));
+                    var count = currentDices.filter(d => d.value === num).length;
+                    var remainingUpperGap = Math.max(0, 63 - upperBaseline);
+                    if (remainingUpperGap > 0 && count > 0) {
+                        util += count * 18 + Math.min(120, remainingUpperGap * 2);
+                    }
+                    if (upperBaseline + score >= 63 && upperBaseline < 63) {
+                        util += 200;
+                    }
+                }
+
+                if (score === 0 && cat === 'chance') util -= 150;
+                if (score === 0 && (cat === 'largeStraight' || cat === 'yahtzee')) util -= 50;
+
                 if (util > bestUtil) {
                     bestUtil = util;
                     bestCat = cat;
@@ -1755,38 +1842,48 @@
             var sum = values.reduce((a, b) => a + b, 0);
             var counts = {};
             for (var v of values) counts[v] = (counts[v] || 0) + 1;
+            var upperTotal = getUpperScore(player);
+            var upperGap = Math.max(0, 63 - upperTotal);
 
             if (score > 0) {
-                if (cat === 'yahtzee') return 1000;
-                if (cat === 'largeStraight') return 500;
-                if (cat === 'smallStraight') return 300;
-                if (cat === 'fullHouse') return 250;
-                if (cat === 'fourOfAKind') return 140 + score;
-                if (cat === 'threeOfAKind') return 100 + score;
-                if (cat === 'chance') return sum >= 21 ? 120 + sum : (sum >= 17 ? 80 + sum : 20 + sum);
+                if (cat === 'yahtzee') return 1200;
+                if (cat === 'largeStraight') return 650;
+                if (cat === 'smallStraight') return 360;
+                if (cat === 'fullHouse') return 320;
+                if (cat === 'fourOfAKind') return 180 + score;
+                if (cat === 'threeOfAKind') return 120 + score;
+                if (cat === 'chance') return sum >= 21 ? 140 + sum : (sum >= 17 ? 90 + sum : 30 + sum);
 
                 if (cat.startsWith('d')) {
                     var num = parseInt(cat.replace('d', ''));
                     var count = counts[num] || 0;
                     var base = score;
-                    if (count >= 4) base = 200 + score * 4;
-                    else if (count === 3) base = 140 + score * 3;
-                    else if (count === 2) base = (num <= 2 ? 60 : 25) + score;
-                    else base = (num === 1 ? 15 : 5) + score;
+                    if (count >= 4) base = 220 + score * 4;
+                    else if (count === 3) base = 150 + score * 3;
+                    else if (count === 2) base = 60 + score + (num >= 5 ? 25 : 0);
+                    else base = 12 + score + (num === 1 ? 8 : 0);
 
-                    var curUpper = getUpperScore(player);
-                    if (curUpper < 63 && (curUpper + score) >= 63) base += 350;
+                    if (upperGap > 0 && upperGap <= score) base += 220;
+                    if (upperGap > 0 && count > 0) base += Math.min(140, count * 18 + upperGap * 2);
                     return base;
                 }
                 return score;
-            } else {
-                var sacrificeRank = {
-                    'd1': -1, 'd2': -5, 'yahtzee': -12, 'd3': -14, 'fourOfAKind': -16,
-                    'fullHouse': -18, 'smallStraight': -20, 'largeStraight': -24,
-                    'threeOfAKind': -22, 'd4': -25, 'd5': -30, 'd6': -35, 'chance': -9999
-                };
-                return sacrificeRank[cat] !== undefined ? sacrificeRank[cat] : -50;
             }
+
+            if (cat.startsWith('d')) {
+                var num = parseInt(cat.replace('d', ''));
+                var count = counts[num] || 0;
+                var basePenalty = -20 - count * 6;
+                if (upperGap > 0 && count > 0) basePenalty += 12;
+                return basePenalty;
+            }
+
+            var sacrificeRank = {
+                'd1': -1, 'd2': -5, 'yahtzee': -18, 'd3': -14, 'fourOfAKind': -18,
+                'fullHouse': -14, 'smallStraight': -20, 'largeStraight': -24,
+                'threeOfAKind': -22, 'd4': -25, 'd5': -30, 'd6': -35, 'chance': -9999
+            };
+            return sacrificeRank[cat] !== undefined ? sacrificeRank[cat] : -50;
         }
 
         function calcP(point, dices) {
